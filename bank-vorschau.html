@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Bank flach 150 – Vorschau</title>
+  <style>
+    html, body { margin: 0; }
+    body {
+      padding: 24px 16px 40px;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #fff;
+      color: #1a1a1a;
+    }
+  </style>
+</head>
+<body>
+
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
+
+<style>
+  .bank-3d {
+    max-width: 960px;
+    margin: 0 auto;
+    font-family: inherit;
+    color: inherit;
+  }
+  .bank-3d model-viewer {
+    display: block;
+    width: 100%;
+    height: 520px;
+    max-height: 75vh;
+    background: transparent;
+    --poster-color: transparent;
+    --progress-bar-color: currentColor;
+  }
+  .bank-3d__ar {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    padding: 12px 18px;
+    border: 0;
+    border-radius: 999px;
+    background: #1a1a1a;
+    color: #fff;
+    font: inherit;
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .25);
+  }
+  .bank-3d__ar:hover,
+  .bank-3d__ar:focus-visible { background: #000; }
+
+  .bank-3d__farbwahl {
+    margin-top: 16px;
+    text-align: center;
+  }
+  .bank-3d__titel {
+    margin: 0 0 10px;
+    font-size: 15px;
+  }
+  .bank-3d__farben {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .bank-3d__swatch {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 0, 0, .25);
+    background: var(--c);
+    cursor: pointer;
+    outline-offset: 3px;
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .bank-3d__swatch:hover { transform: scale(1.08); }
+  .bank-3d__swatch[aria-checked="true"] {
+    box-shadow: 0 0 0 3px #fff, 0 0 0 5px #1a1a1a;
+  }
+  .bank-3d__hinweis {
+    margin: 12px 0 0;
+    font-size: 12px;
+    opacity: .65;
+  }
+</style>
+
+<div class="bank-3d">
+  <model-viewer
+    id="bank-viewer"
+    src="https://cdn.jsdelivr.net/gh/MarkusEiskaffee/3D-Modelle@main/Bank-flach-150-Brand-2.glb"
+    alt="Bank flach, 150 cm, als drehbares 3D-Modell"
+    camera-controls
+    touch-action="pan-y"
+    camera-orbit="35deg 70deg auto"
+    max-camera-orbit="auto 90deg auto"
+    shadow-intensity="1"
+    shadow-softness="0.8"
+    environment-image="neutral"
+    exposure="1"
+    interaction-prompt="auto"
+    ar
+    ar-modes="webxr scene-viewer quick-look"
+    ar-scale="fixed">
+    <button slot="ar-button" class="bank-3d__ar" type="button">In AR ansehen</button>
+  </model-viewer>
+
+  <div class="bank-3d__farbwahl">
+    <p class="bank-3d__titel">Farbe Gestell: <strong id="bank-farbname"></strong></p>
+    <div class="bank-3d__farben" id="bank-farben" role="radiogroup" aria-label="Farbe des Gestells"></div>
+    <p class="bank-3d__hinweis">Die Farbdarstellung am Bildschirm ist eine Annäherung an die RAL-Farbtöne.</p>
+  </div>
+</div>
+
+<script>
+  (function () {
+    // ---------- Einstellungen ----------
+    var MATERIAL_NAME = 'Gestell';   // Name des Materials im GLB
+    var START_INDEX = 1;             // 0 = Melonengelb, 1 = Blutorange, 2 = Verkehrsweiß, 3 = Tiefschwarz
+    var ROUGHNESS = null;            // null = Wert aus dem Modell behalten, sonst z. B. 0.45 (0 = glänzend, 1 = matt)
+    var METALLIC = null;             // null = Wert aus dem Modell behalten, sonst 0 bis 1
+
+    // Farbwerte sind sRGB-Näherungen der RAL-Farben (hier anpassbar)
+    var FARBEN = [
+      { ral: 'RAL 1028', name: 'Melonengelb',  hex: '#FFAB00' },
+      { ral: 'RAL 2002', name: 'Blutorange',   hex: '#C63927' },
+      { ral: 'RAL 9016', name: 'Verkehrsweiß', hex: '#F6F6F6' },
+      { ral: 'RAL 9005', name: 'Tiefschwarz',  hex: '#0A0A0A' }
+    ];
+    // -----------------------------------
+
+    var viewer = document.getElementById('bank-viewer');
+    var box = document.getElementById('bank-farben');
+    var nameEl = document.getElementById('bank-farbname');
+    var current = START_INDEX;
+    var buttons = [];
+
+    function findMaterial() {
+      if (!viewer.model) return null;
+      var wanted = MATERIAL_NAME.toLowerCase();
+      for (var i = 0; i < viewer.model.materials.length; i++) {
+        if ((viewer.model.materials[i].name || '').toLowerCase() === wanted) {
+          return viewer.model.materials[i];
+        }
+      }
+      return null;
+    }
+
+    function applyColor() {
+      var mat = findMaterial();
+      if (!mat) {
+        if (viewer.model) {
+          console.warn('Material "' + MATERIAL_NAME + '" nicht gefunden. Vorhanden:',
+            viewer.model.materials.map(function (m) { return m.name; }));
+        }
+        return;
+      }
+      var pbr = mat.pbrMetallicRoughness;
+      pbr.setBaseColorFactor(FARBEN[current].hex);
+      if (ROUGHNESS !== null) pbr.setRoughnessFactor(ROUGHNESS);
+      if (METALLIC !== null) pbr.setMetallicFactor(METALLIC);
+    }
+
+    function select(index, focus) {
+      current = index;
+      buttons.forEach(function (b, i) {
+        var on = i === index;
+        b.setAttribute('aria-checked', on ? 'true' : 'false');
+        b.tabIndex = on ? 0 : -1;
+        if (on && focus) b.focus();
+      });
+      nameEl.textContent = FARBEN[index].ral + ' ' + FARBEN[index].name;
+      applyColor();
+    }
+
+    FARBEN.forEach(function (f, i) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'bank-3d__swatch';
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-label', f.ral + ' ' + f.name);
+      b.title = f.ral + ' ' + f.name;
+      b.style.setProperty('--c', f.hex);
+      b.addEventListener('click', function () { select(i, false); });
+      b.addEventListener('keydown', function (e) {
+        var n = FARBEN.length;
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); select((current + 1) % n, true); }
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); select((current - 1 + n) % n, true); }
+      });
+      box.appendChild(b);
+      buttons.push(b);
+    });
+
+    select(current, false);
+    viewer.addEventListener('load', applyColor);
+    if (viewer.loaded) applyColor();
+  })();
+</script>
+
+</body>
+</html>
